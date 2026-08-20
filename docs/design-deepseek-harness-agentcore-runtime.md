@@ -66,10 +66,10 @@ DSH commit、Python SDK 版本和 custom runtime artifact。
 
 **源码依据：**
 
-- [DSH 项目 README](/home/ubuntu/g-repo/dsh/deepseek-harness/README.md)
-- [DSH 架构说明](/home/ubuntu/g-repo/dsh/deepseek-harness/docs/architecture.md)
-- [Cordis 入门](/home/ubuntu/g-repo/dsh/deepseek-harness/docs/cordis-primer.md)
-- [DSH Base Bundle](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/bundle/base/cordis.patch.yml)
+- [DSH 项目 README](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/README.md)
+- [DSH 架构说明](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/docs/architecture.md)
+- [Cordis 入门](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/docs/cordis-primer.md)
+- [DSH Base Bundle](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/bundle/base/cordis.patch.yml)
 
 ### 0.3 DSH 的核心组件如何协作
 
@@ -131,11 +131,11 @@ Session event log 同时服务于：
 
 **源码依据：**
 
-- [Cordis Service 与依赖](/home/ubuntu/g-repo/dsh/deepseek-harness/docs/cordis-tutorial/03-services.md)
-- [DSH Agent 生命周期](/home/ubuntu/g-repo/dsh/deepseek-harness/docs/agent-lifecycle.md)
-- [DSH Session 子系统](/home/ubuntu/g-repo/dsh/deepseek-harness/docs/subsystems/session.md)
-- [DSH Tool Pipeline](/home/ubuntu/g-repo/dsh/deepseek-harness/docs/tool-execution-pipeline.md)
-- [DSH Tool Catalog](/home/ubuntu/g-repo/dsh/deepseek-harness/docs/tool-catalog.md)
+- [Cordis Service 与依赖](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/docs/cordis-tutorial/03-services.md)
+- [DSH Agent 生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/docs/agent-lifecycle.md)
+- [DSH Session 子系统](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/docs/subsystems/session.md)
+- [DSH Tool Pipeline](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/docs/tool-execution-pipeline.md)
+- [DSH Tool Catalog](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/docs/tool-catalog.md)
 
 ### 0.4 DSH 当前是如何运行的
 
@@ -177,12 +177,12 @@ Browser 并不是一次性下载一个完整 SPA。DSH Host 会：
 
 **源码依据：**
 
-- [Web App Bundle](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/bundle/web-app/cordis.patch.yml)
-- [Web Boot Kernel](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/client/web/src/boot.tsx)
-- [Client Module Host](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/client/modules/src/index.ts)
-- [Browser Connection](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/client/connection/src/client/web-api-client.ts)
-- [Host Connection](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/client/connection/src/index.ts)
-- [DSH RPC Map](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/host/apiproxy/src/api/rpc-map.ts)
+- [Web App Bundle](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/bundle/web-app/cordis.patch.yml)
+- [Web Boot Kernel](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/client/web/src/boot.tsx)
+- [Client Module Host](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/client/modules/src/index.ts)
+- [Browser Connection](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/client/connection/src/client/web-api-client.ts)
+- [Host Connection](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/client/connection/src/index.ts)
+- [DSH RPC Map](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/host/apiproxy/src/api/rpc-map.ts)
 
 ### 0.5 DSH Python SDK 是什么
 
@@ -210,10 +210,10 @@ Stock SDK 不提供完整 DSH Web API，因此无法独立支撑现有 Web UI。
 
 **源码依据：**
 
-- [Python SDK 说明](/home/ubuntu/g-repo/dsh/deepseek-harness/python/sdk/README.md)
-- [Python SDK API](/home/ubuntu/g-repo/dsh/deepseek-harness/python/sdk/src/deepseek_harness/api.py)
-- [Python SDK Client](/home/ubuntu/g-repo/dsh/deepseek-harness/python/sdk/src/deepseek_harness/client.py)
-- [SDK Protocol](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/sdk/protocol/README.md)
+- [Python SDK 说明](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/python/sdk/README.md)
+- [Python SDK API](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/python/sdk/src/deepseek_harness/api.py)
+- [Python SDK Client](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/python/sdk/src/deepseek_harness/client.py)
+- [SDK Protocol](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/sdk/protocol/README.md)
 
 ### 0.6 AgentCore Runtime 是什么
 
@@ -363,8 +363,8 @@ WebSocket:
 
 **引用：**
 
-- [DSH API Path 定义](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/client/connection/src/api-path.ts)
-- [DSH WebSocket 下行实现](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/client/connection/src/client/web-api-client.ts)
+- [DSH API Path 定义](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/client/connection/src/api-path.ts)
+- [DSH WebSocket 下行实现](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/client/connection/src/client/web-api-client.ts)
 - [AgentCore HTTP 协议](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-http-protocol-contract.html)
 - [AgentCore WebSocket 协议](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-websocket.html)
 
@@ -413,8 +413,8 @@ agent presets
 
 **引用：**
 
-- [SDK Wire Methods](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/sdk/protocol/README.md)
-- [完整 DSH RpcMethodMap](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/host/apiproxy/src/api/rpc-map.ts)
+- [SDK Wire Methods](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/sdk/protocol/README.md)
+- [完整 DSH RpcMethodMap](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/host/apiproxy/src/api/rpc-map.ts)
 
 ### 挑战 4：DSH 与 AgentCore 有两套 Session
 
@@ -921,7 +921,7 @@ CI 必须启动 Web-only profile 并验证：
 
 **Profile 来源：**
 
-- 以 [DSH Web App Bundle](/home/ubuntu/g-repo/dsh/deepseek-harness/packages/bundle/web-app/cordis.patch.yml)
+- 以 [DSH Web App Bundle](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/bundle/web-app/cordis.patch.yml)
   的 browser roster 为基础。
 - 用 `cloud-client-connection` 替换原 Host connection。
 - 禁用该 bundle 中所有 agent-plane 和本地宿主能力。
@@ -1895,18 +1895,20 @@ DSH SDK JSON-RPC
 
 ### DSH
 
-- `/home/ubuntu/g-repo/dsh/deepseek-harness/packages/client/connection/`
-- `/home/ubuntu/g-repo/dsh/deepseek-harness/packages/client/modules/`
-- `/home/ubuntu/g-repo/dsh/deepseek-harness/packages/host/apiproxy/`
-- `/home/ubuntu/g-repo/dsh/deepseek-harness/packages/sdk/protocol/`
-- `/home/ubuntu/g-repo/dsh/deepseek-harness/python/sdk/`
+- `packages/client/connection/`
+- `packages/client/modules/`
+- `packages/host/apiproxy/`
+- `packages/sdk/protocol/`
+- `python/sdk/`
 
 ### AgentCore Samples
 
-- `/home/ubuntu/g-repo/sample-AgentCore-End2End-Solution-with-Visualization/`
-- `/home/ubuntu/g-repo/amazon-bedrock-agentcore-samples/06-workshops/01-AgentCore-runtime/12-coding-agents/`
-- `/home/ubuntu/g-repo/amazon-bedrock-agentcore-samples/01-features/03-connect-your-agent-to-anything/03-web-search/`
-- `/home/ubuntu/g-repo/amazon-bedrock-agentcore-samples/06-workshops/04-AgentCore-memory/`
+公开 AWS 样例仓库：[awslabs/amazon-bedrock-agentcore-samples](https://github.com/awslabs/amazon-bedrock-agentcore-samples)
+
+- [Coding Agents workshop](https://github.com/awslabs/amazon-bedrock-agentcore-samples/tree/main/06-workshops/01-AgentCore-runtime/12-coding-agents)
+- [Connect your agent to anything — Web Search](https://github.com/awslabs/amazon-bedrock-agentcore-samples/tree/main/01-features/03-connect-your-agent-to-anything/03-web-search)
+- [AgentCore Memory workshop](https://github.com/awslabs/amazon-bedrock-agentcore-samples/tree/main/06-workshops/04-AgentCore-memory)
+- `sample-AgentCore-End2End-Solution-with-Visualization`（内部样例，用于 WebUI 认证/可视化参考）
 
 ### AWS 官方文档
 
