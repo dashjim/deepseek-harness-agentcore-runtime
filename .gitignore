@@ -14,6 +14,7 @@ config/runtime_config.json
 .build/
 config/cognito_ids.txt
 config/deployment-env.md
+scripts/deploy.env
 web-bff/static/
 web-bff/artifacts/
 alp/code.zip
