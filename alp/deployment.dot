@@ -1,0 +1,54 @@
+digraph deployment {
+  rankdir=TB;
+  bgcolor="white";
+  labelloc="t"; fontname="Helvetica"; fontsize=22;
+  label="部署视图：构建时「烘焙」进镜像 vs 运行时跑什么（us-west-2）\n";
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=13, margin="0.2,0.13", color="#37475A", fontcolor="#0f1b2d"];
+  edge [fontname="Helvetica", fontsize=11, color="#37475A"];
+  nodesep=0.45; ranksep=0.6;
+
+  // ---- Build time (bake once) ----
+  subgraph cluster_build {
+    label="构建时 Build-time（一次性，产物固化进镜像）"; fontsize=15; color="#9bb4d0"; style="rounded"; bgcolor="#FbFdff";
+    dshsrc [label="DSH monorepo\n（钉住 commit，只读）", fillcolor="#EAF2FB"];
+    dshweb [label="跑一次 `dsh web`\n渲染出前端静态", fillcolor="#FFF4E5"];
+    capture [label="捕获静态闭包\nindex.html(+__DSH_BOOT__)\n/assets/* + 38×/plugins/<id>/client.js", fillcolor="#FFF4E5"];
+    pnpm [label="pnpm deploy\nDSH runtime 闭包", fillcolor="#FFF4E5"];
+    dshsrc -> dshweb -> capture;
+    dshsrc -> pnpm;
+  }
+
+  // ---- Images ----
+  subgraph cluster_img {
+    label="两个自包含镜像（ARM64，推 ECR）"; fontsize=15; color="#9bb4d0"; style="rounded"; bgcolor="#FbFdff";
+    bffimg [label="BFF 镜像\nNode BFF(server.mjs) + 烘焙的 static/\n（无 dsh web 进程、无 monorepo）", fillcolor="#E8F5E9"];
+    rtimg [label="Runtime 镜像\nPython adapter + 烘焙的 DSH runtime 闭包 + cordis", fillcolor="#E8F5E9"];
+  }
+
+  capture -> bffimg [label="烘焙静态（COPY 进镜像）", style=bold, color="#c0392b", fontcolor="#c0392b"];
+  pnpm -> rtimg [label="烘焙 runtime 闭包", style=bold, color="#c0392b", fontcolor="#c0392b"];
+
+  // ---- Deployed runtime ----
+  subgraph cluster_run {
+    label="运行时 Runtime（部署后真正跑的东西）"; fontsize=15; color="#9bb4d0"; style="rounded"; bgcolor="#FbF7FE";
+    cf [label="CloudFront (HTTPS)", fillcolor="#FFF4E5"];
+    alb [label="ALB\n入站仅 CloudFront 前缀列表", fillcolor="#FDECEA"];
+    ecs [label="ECS Fargate — 只跑 BFF 一个进程\n发静态 UI + /api + 两条 WS + 认证/路由", fillcolor="#E8F5E9"];
+    rt [label="AgentCore Runtime · 每用户 micro-VM\nadapter + DSH agent loop/工具", fillcolor="#EAF2FB"];
+    bedrock [label="Amazon Bedrock\nus.openai.gpt-5.6-sol", fillcolor="#FFF4E5"];
+    cog [label="Cognito", fillcolor="#F3E8FD"];
+    ddb [label="DynamoDB\nSession Directory", fillcolor="#F3E8FD"];
+    sm [label="Secrets Manager", fillcolor="#F3E8FD"];
+  }
+
+  bffimg -> ecs [label="部署", style=dashed];
+  rtimg -> rt [label="部署", style=dashed];
+
+  cf -> alb -> ecs;
+  ecs -> rt [label="SigV4 InvokeAgentRuntime\nruntimeSessionId 路由到同一 VM"];
+  rt -> bedrock [label="Converse (VPC 端点)"];
+  ecs -> cog [style=dotted, label="登录"];
+  ecs -> ddb [style=dotted, label="归属"];
+  ecs -> sm [style=dotted, label="密钥"];
+  { rank=same; cog; ddb; sm; }
+}

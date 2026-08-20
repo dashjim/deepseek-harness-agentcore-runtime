@@ -2059,3 +2059,34 @@ sequenceDiagram
 2. **会话历史/上下文目前不持久化**。BFF 的会话事件日志存在**进程内存**（`sessions` Map），BFF 任务重启即丢；DynamoDB 只存**路由元数据**（workspaceId、runtimeSessionId、lastActivityAt），**不存对话事件**。DSH session 日志在 micro-VM 内、随 VM 回收而失。
 
 结论：**路由键稳定、会“尽量”回到同一 VM；但"回到上次的对话/上下文"目前不保证**——重启或 VM 回收后，用户回到同一 workspace/路由，却很可能是**全新会话**。要做到跨访问的持久会话，需补设计 §10 的 workspace/session 持久化（EFS 或 S3/DynamoDB 存事件日志）——这是已登记的后续项（见 D）。
+
+### I. 部署视图：什么叫"烘焙静态"，以及新旧调用链
+
+![部署视图](../alp/deployment.png)
+
+（图源 `alp/deployment.dot` / `alp/deployment.png`。）
+
+**"烘焙静态"（bake static）是什么意思？**
+正常 `dsh web` 是个进程，运行时**动态**把前端资源发给浏览器（`index.html` + 注入的 `window.__DSH_BOOT__` 清单 + `/assets/*` + 38 个 `/plugins/<id>/client.js`）。我们云上**不跑这个进程**，而是在**构建镜像时**让 `dsh web` 渲染**一次**，把它会发的那批文件**捕获下来、COPY 进 BFF 镜像**（`web-bff/static/`）。运行时 BFF 就当普通静态服务器把这些文件发出去——像"预先烤好蛋糕装箱"，而不是运行时再开烤箱。好处：镜像小、无需在容器里跑整个 DSH monorepo、BFF 独占协议/认证/路由。代价：DSH 版本升级时要**重新烘焙**一次静态。
+
+**新旧调用链对比（回答"是不是 DSH web → BFF → adapter/SDK → DSH backend"）：**
+
+```text
+本来（本地 dsh web）：
+  浏览器(DSH UI)  ──/api + WS──►  dsh web 进程（= 前端服务 + 后端 agent loop/工具，同一进程）
+
+现在（本部署）：
+  浏览器(DSH UI)
+    │  /api + WS
+    ▼
+  BFF ── 自己应答 boot/session/workspace 等 /api+WS（不回连 DSH 后端）
+    │  仅"执行一个 prompt turn"时：
+    │  SigV4 InvokeAgentRuntime（runtimeSessionId 路由到同一 micro-VM）
+    ▼
+  AgentCore Runtime micro-VM：Python adapter ──Python SDK──► DSH runtime(agent loop + bash/文件工具 = "DSH 后端") ──► Bedrock
+```
+
+要点：
+- 你的链路方向是对的：**DSH UI → BFF → Runtime(adapter/SDK) → DSH 后端（agent loop/工具）**。
+- 但 "DSH web" 指的是**浏览器里的 DSH 前端**；那个 `dsh web` **进程本身云上不运行**（其前端产物被烘焙进 BFF 镜像）。
+- BFF **不是 DSH 后端的透明代理**：绝大多数 `/api`+WS 由 BFF 自己实现，**只有 prompt turn 才下发到 Runtime**（真正的 DSH 后端在那里由 SDK 启动）。
