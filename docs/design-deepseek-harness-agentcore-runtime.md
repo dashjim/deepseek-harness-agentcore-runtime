@@ -10,35 +10,32 @@
 
 ---
 
-## 实现回顾与偏差（实测标注，2026-08-19）
+## 目录
 
-> 本节由实现方在把本设计真正落地、部署上云并端到端验证后回填，记录**实际做法与本设计的差异**及本设计未覆盖的落地事实。原设计正文未改，观察集中于此。完整代码/脚本/证据见开源实现仓库 `deepseek-harness-agentcore-runtime`（另有 `docs/design-deviations.md`、`docs/review-of-design-doc.md`、`docs/PHASE2-runtime-deploy.md`、`docs/auth-design.md`）。
-
-### 落地状态
-Phase 1（本地真 Bedrock）与 Phase 2（真云部署：Runtime + 身份/权限 + Web + 浏览器 e2e）**已完成并验证**：真实浏览器经 CloudFront(HTTPS)→Cognito 登录→云端 AgentCore Runtime 执行 bash 工具→回复渲染在 DSH Web 界面；两用户隔离（跨用户 workspace 访问 403）实测通过；安全姿态独立复核（无 0.0.0.0/0、IAM 无通配、Runtime VPC 无 NAT/IGW）。
-
-### A. 有意的架构偏差
-| 设计章节 | 设计说法 | 实际实现 | 理由 |
-|---|---|---|---|
-| §4.3 传输 | prompt 走 HTTP 只回 receipt，模型/工具事件走 `/ws` **流式** | adapter 用**阻塞 `/invocations`** 一次性返回最终结果；BFF 再合成 mux 事件 | MVP 已验证阻塞足够；流式 `/ws` 列为后续增量。**与异步事件模型的实质差异** |
-| §6 Web BFF | 跑 DSH 的 "Web-only Cordis profile"，裁剪 agent-plane rows | **独立最小 BFF**（Node+ws）：托管 DSH 静态 UI + 自接管 `/api/*` 与两条 WS，转发到云端 Runtime | 更简、对 DSH 版本更鲁棒，不做脆弱的 plugin roster 手术 |
-| 浏览器↔Runtime | （build-agent 通用建议：浏览器直连 Runtime 带 JWT） | **保留 BFF 中间层**，浏览器不直连 Runtime | DSH 浏览器协议 ≠ AgentCore 契约，必须 BFF 翻译；且用 HttpOnly cookie 比浏览器持 JWT 更安全 |
-
-### B. 设计未覆盖 / 说得不够的落地事实
-- **§9 DSH runtime 打包**：预编译二进制**不随仓库分发**，零配置 `DeepSeekHarness()` 会失败。实际用 `pnpm deploy` 把 DSH runtime **闭包烘焙进自包含 ARM64 镜像**（云端无挂载）；本地开发用 source 模式。设计 §17 的两行 build 远不够。
-- **模型 provider（§9/pi-ai）**：pi-ai 的 Bedrock 认证**不探测 IMDS**，EC2 实例角色/容器角色下需用 boto3 冻结凭证注入子进程 env；且需显式 custom cordis 选 `dsh-llm-pi-ai` 的 `amazon-bedrock` 路由。（长会话 >1h 冻结凭证会过期，需刷新计时器——后续项。）
-- **DSH web boot 契约（§5/§6 未枚举）**：冷启动必答 `host.describe`(gate)/`workspace.list`(时间戳须 ISO 字符串)/`session.list`；`session.models` 须 `routable:true`；`settings.describe` 须预确认 onboarding notice；`assistant/message` 事件的 `surfaceOp:"append"` 必须是**顶层字段**（与 `data` 平级）才渲染。
-- **AgentCore/网络运行时坑**：`update-agent-runtime` 与 ECS task-def 更新都是**全量替换**（漏传 env/secrets 会被清空）；Runtime name 须匹配 `^[a-zA-Z][a-zA-Z0-9_]{0,47}$`；下行 WebSocket 需**服务端 ~25s ping keepalive**，否则 ALB 60s 空闲超时会断连、客户端反复 "connection lost"；VPC 无 NAT 模式下容器拉 ECR 镜像需放行 **S3 网关前缀列表**出站。
-- **§16 session.export**：是 **GET 下载端点**，且 DSH 下载按钮**先 HEAD 探测再 GET**——BFF 两个方法都要处理（只处理 GET 会 404）。
-
-### C. 与本设计一致、已按设计实现
-- §7 身份/Session Directory：`actorId=HMAC` 服务端派生、`runtimeSessionId` 服务端生成不暴露、DynamoDB 每请求归属校验（防 IDOR）——已实现并实测隔离。
-- §16/§17 安全/网络：CloudFront 唯一公网入口(HTTPS)、ALB 入站仅 CloudFront 前缀列表、Runtime VPC 无 NAT/IGW 仅端点出站、IAM 最小权限（Bedrock invoke 精确到模型 ARN）——已实现并独立复核。
-- §1 目标 6「不改 DSH 核心」：**严格遵守**，DSH 上游仓库全程零改动，全部外围适配。
-
-### D. 尚未实现（按设计记录为后续）
-流式 `/ws` 逐 token 渲染、§11 全局 AgentCore Memory、托管 Web Search、§4/§8 完整交互协议（turn-cancel/approval/user-question/subagent 控制）、DSH 工具巡检面板（`dynamicCordisRunner` 已返回合法空值消除报错，但面板未接真数据）。
-
+- [0. 文档目的、系统背景与术语](#0-文档目的系统背景与术语)
+- [1. 总体设计目标](#1-总体设计目标)
+- [2. 总体系统挑战](#2-总体系统挑战)
+- [3. 总体模块划分](#3-总体模块划分)
+- [4. 传输通道设计](#4-传输通道设计)
+- [4.1 最终结论](#41-最终结论)
+- [5. 模块 M1：DSH 浏览器客户端](#5-模块-m1dsh-浏览器客户端)
+- [6. 模块 M2：动态 Web Host/BFF](#6-模块-m2动态-web-hostbff)
+- [7. 模块 M3：身份与 Session Directory](#7-模块-m3身份与-session-directory)
+- [8. 模块 M4：AgentCore Runtime Python Adapter](#8-模块-m4agentcore-runtime-python-adapter)
+- [9. 模块 M5：Custom DSH SDK Runtime](#9-模块-m5custom-dsh-sdk-runtime)
+- [10. 模块 M6：Workspace 与 Artifact Storage](#10-模块-m6workspace-与-artifact-storage)
+- [11. 模块 M7：一个全局 AgentCore Memory](#11-模块-m7一个全局-agentcore-memory)
+- [12. 模块 M8：Bedrock GPT 模型](#12-模块-m8bedrock-gpt-模型)
+- [13. 模块 M9：AgentCore Web Search](#13-模块-m9agentcore-web-search)
+- [14. 模块 M10：可观测性与管理](#14-模块-m10可观测性与管理)
+- [15. 多用户与租户设计](#15-多用户与租户设计)
+- [16. 安全设计](#16-安全设计)
+- [17. 网络与部署设计](#17-网络与部署设计)
+- [18. 实施阶段](#18-实施阶段)
+- [19. 验证场景](#19-验证场景)
+- [20. 最终架构结论](#20-最终架构结论)
+- [21. 参考代码与文档](#21-参考代码与文档)
+- [实现回顾与偏差（实测标注，2026-08-19）](#实现回顾与偏差实测标注2026-08-19)
 ---
 
 ## 0. 文档目的、系统背景与术语
@@ -1920,3 +1917,35 @@ DSH SDK JSON-RPC
 - https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html
 - https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html
 - https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-connector-web-search-tool.html
+
+
+---
+
+## 实现回顾与偏差（实测标注，2026-08-19）
+
+> 本节由实现方在把本设计真正落地、部署上云并端到端验证后回填，记录**实际做法与本设计的差异**及本设计未覆盖的落地事实。原设计正文未改，观察集中于此。完整代码/脚本/证据见开源实现仓库 `deepseek-harness-agentcore-runtime`（另有 `docs/design-deviations.md`、`docs/review-of-design-doc.md`、`docs/PHASE2-runtime-deploy.md`、`docs/auth-design.md`）。
+
+### 落地状态
+Phase 1（本地真 Bedrock）与 Phase 2（真云部署：Runtime + 身份/权限 + Web + 浏览器 e2e）**已完成并验证**：真实浏览器经 CloudFront(HTTPS)→Cognito 登录→云端 AgentCore Runtime 执行 bash 工具→回复渲染在 DSH Web 界面；两用户隔离（跨用户 workspace 访问 403）实测通过；安全姿态独立复核（无 0.0.0.0/0、IAM 无通配、Runtime VPC 无 NAT/IGW）。
+
+### A. 有意的架构偏差
+| 设计章节 | 设计说法 | 实际实现 | 理由 |
+|---|---|---|---|
+| §4.3 传输 | prompt 走 HTTP 只回 receipt，模型/工具事件走 `/ws` **流式** | adapter 用**阻塞 `/invocations`** 一次性返回最终结果；BFF 再合成 mux 事件 | MVP 已验证阻塞足够；流式 `/ws` 列为后续增量。**与异步事件模型的实质差异** |
+| §6 Web BFF | 跑 DSH 的 "Web-only Cordis profile"，裁剪 agent-plane rows | **独立最小 BFF**（Node+ws）：托管 DSH 静态 UI + 自接管 `/api/*` 与两条 WS，转发到云端 Runtime | 更简、对 DSH 版本更鲁棒，不做脆弱的 plugin roster 手术 |
+| 浏览器↔Runtime | （build-agent 通用建议：浏览器直连 Runtime 带 JWT） | **保留 BFF 中间层**，浏览器不直连 Runtime | DSH 浏览器协议 ≠ AgentCore 契约，必须 BFF 翻译；且用 HttpOnly cookie 比浏览器持 JWT 更安全 |
+
+### B. 设计未覆盖 / 说得不够的落地事实
+- **§9 DSH runtime 打包**：预编译二进制**不随仓库分发**，零配置 `DeepSeekHarness()` 会失败。实际用 `pnpm deploy` 把 DSH runtime **闭包烘焙进自包含 ARM64 镜像**（云端无挂载）；本地开发用 source 模式。设计 §17 的两行 build 远不够。
+- **模型 provider（§9/pi-ai）**：pi-ai 的 Bedrock 认证**不探测 IMDS**，EC2 实例角色/容器角色下需用 boto3 冻结凭证注入子进程 env；且需显式 custom cordis 选 `dsh-llm-pi-ai` 的 `amazon-bedrock` 路由。（长会话 >1h 冻结凭证会过期，需刷新计时器——后续项。）
+- **DSH web boot 契约（§5/§6 未枚举）**：冷启动必答 `host.describe`(gate)/`workspace.list`(时间戳须 ISO 字符串)/`session.list`；`session.models` 须 `routable:true`；`settings.describe` 须预确认 onboarding notice；`assistant/message` 事件的 `surfaceOp:"append"` 必须是**顶层字段**（与 `data` 平级）才渲染。
+- **AgentCore/网络运行时坑**：`update-agent-runtime` 与 ECS task-def 更新都是**全量替换**（漏传 env/secrets 会被清空）；Runtime name 须匹配 `^[a-zA-Z][a-zA-Z0-9_]{0,47}$`；下行 WebSocket 需**服务端 ~25s ping keepalive**，否则 ALB 60s 空闲超时会断连、客户端反复 "connection lost"；VPC 无 NAT 模式下容器拉 ECR 镜像需放行 **S3 网关前缀列表**出站。
+- **§16 session.export**：是 **GET 下载端点**，且 DSH 下载按钮**先 HEAD 探测再 GET**——BFF 两个方法都要处理（只处理 GET 会 404）。
+
+### C. 与本设计一致、已按设计实现
+- §7 身份/Session Directory：`actorId=HMAC` 服务端派生、`runtimeSessionId` 服务端生成不暴露、DynamoDB 每请求归属校验（防 IDOR）——已实现并实测隔离。
+- §16/§17 安全/网络：CloudFront 唯一公网入口(HTTPS)、ALB 入站仅 CloudFront 前缀列表、Runtime VPC 无 NAT/IGW 仅端点出站、IAM 最小权限（Bedrock invoke 精确到模型 ARN）——已实现并独立复核。
+- §1 目标 6「不改 DSH 核心」：**严格遵守**，DSH 上游仓库全程零改动，全部外围适配。
+
+### D. 尚未实现（按设计记录为后续）
+流式 `/ws` 逐 token 渲染、§11 全局 AgentCore Memory、托管 Web Search、§4/§8 完整交互协议（turn-cancel/approval/user-question/subagent 控制）、DSH 工具巡检面板（`dynamicCordisRunner` 已返回合法空值消除报错，但面板未接真数据）。

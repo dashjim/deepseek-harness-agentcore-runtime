@@ -10,6 +10,9 @@ agent** on **Amazon Bedrock AgentCore Runtime** — keeping DSH's native Web UI,
 > talking DSH's own Web protocol; a thin BFF bridges it to AgentCore and adds Cognito login +
 > per-user isolation. **DSH itself is used unmodified** (out-of-tree adapter).
 
+📄 **Full design doc** (with implementation notes & deviations merged in):
+[docs/design-deepseek-harness-agentcore-runtime.md](docs/design-deepseek-harness-agentcore-runtime.md)
+
 ![DSH Web UI rendering a reply from the cloud AgentCore Runtime](alp/screenshots/cloud-03-reply.png)
 
 ## Architecture

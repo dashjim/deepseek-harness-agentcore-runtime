@@ -9,6 +9,9 @@
 > Web 协议；一个薄 BFF 把它桥接到 AgentCore，并加上 Cognito 登录 + 每用户隔离。
 > **DSH 本身零改动**（全部通过外围适配层）。
 
+📄 **完整设计文档**（已合并实测标注与偏差）：
+[docs/design-deepseek-harness-agentcore-runtime.md](docs/design-deepseek-harness-agentcore-runtime.md)
+
 ![DSH Web 界面渲染来自云端 AgentCore Runtime 的回复](alp/screenshots/cloud-03-reply.png)
 
 ## 架构
