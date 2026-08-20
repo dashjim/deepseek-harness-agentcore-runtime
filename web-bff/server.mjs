@@ -1,5 +1,5 @@
 /**
- * Production-grade local BFF for the DeepSeek Harness (DSH) Web UI, fronting a
+ * Local BFF for the DeepSeek Harness (DSH) Web UI, fronting a
  * *cloud* AgentCore Runtime.
  *
  * Separation of concerns (unchanged from the earlier local bridge):
@@ -13,7 +13,7 @@
  *   - Static UI assets (GET /, /plugins/*, /assets/*) are reverse-proxied from a
  *     running `dsh web` so a real browser can load the shell.
  *
- * What this version adds (Phase 2 "production BFF", ref docs/auth-design.md):
+ * What this version adds (Phase 2, ref docs/auth-design.md):
  *   1. Cognito login (server-side USER_PASSWORD_AUTH + SECRET_HASH); browser
  *      never holds a JWT — only a Secure+HttpOnly+SameSite=Lax session cookie.
  *      Unauthenticated /api/* and WS => 401 / redirect. Origin checked (CSRF).

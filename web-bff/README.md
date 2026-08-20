@@ -1,4 +1,4 @@
-# DSH Web BFF（生产级）
+# DSH Web BFF
 
 浏览器面向的 DSH Web UI 与**云端 AgentCore Runtime** 之间的 Backend-For-Frontend。
 它承担：Cognito 登录、服务端会话（浏览器只拿 HttpOnly cookie，不持 JWT）、
