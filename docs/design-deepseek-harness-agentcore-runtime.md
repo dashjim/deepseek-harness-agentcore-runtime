@@ -2027,3 +2027,35 @@ sequenceDiagram
 与设计 §9 的差异：设计设想"custom DSH runtime + 扩展 JSON-RPC server"补齐 Web API；**实际没有构建扩展 runtime**，而是"stock SDK 跑 turn + BFF 模拟最小 Web 协议"。所以 SDK 的"不支持"**不是靠扩展 SDK 解决的**，而是靠 **BFF 侧模拟 + 把真正的模型/工具执行下沉到 Runtime（SDK）** 解决。
 
 对"是不是没用 Python SDK 而直接用 RPC"的直接回答：**部分正确**——BFF 对浏览器这一侧确实是直接实现 RPC/WS 协议（没用 SDK）；但 Runtime 那一侧执行 turn 仍用 Python SDK（SDK 内部再对 DSH runtime 走 stdio JSON-RPC）。代价：DSH 高级 Web 能力（fork/search/subagent 控制/attachment/真流式）目前未接入（见 D 项后续）。
+
+**举例：用户在界面上发一句"运行 `echo hello` 并说明输出"，从点发送到看见回复，各环节谁负责、是既有还是新增、在前端还是后端：**
+
+| 环节 | 谁提供 | 既有(DSH) / 新增(本项目) | 在哪一层 |
+|---|---|---|---|
+| 渲染输入框、聊天流、工具卡片 | DSH client plugins | **既有**（未改一行） | Web 前端（DSH） |
+| Cognito 登录、HttpOnly cookie、CSRF/Origin 校验 | BFF | **新增** | 后端 · Web 平面（BFF） |
+| 收 `POST /api/session.prompt`、鉴权、owner 归属校验 | BFF | **新增** | 后端 · Web 平面（BFF） |
+| 应答 boot RPC（host.describe/workspace.list/session.list/…） | BFF **合成**（正常由 `dsh web` host 提供，这里没跑它） | **新增**（替代 DSH host 的那部分职责） | 后端 · Web 平面（BFF） |
+| 选路由 VM：派生/查 `runtimeSessionId`、Session Directory | BFF + DynamoDB | **新增** | 后端 · Web 平面（BFF） |
+| `/ping`+`/invocations` 契约、懒启动、冻结凭证注入子进程 | Python Adapter | **新增** | 后端 · Agent 平面（adapter） |
+| Agent loop：调模型、决定调 `bash` 工具、把结果喂回模型 | DSH agent loop | **既有**（SDK 启动的 DSH runtime 内，未改） | 后端 · Agent 平面（DSH） |
+| `bash` 工具真正执行 `echo hello` | DSH tool provider | **既有** | 后端 · Agent 平面 micro-VM（DSH） |
+| 模型走 **Bedrock GPT** 而非 DeepSeek 官方 | cordis 配置选 `amazon-bedrock` provider | **新增（是配置，不是改码）** | 后端 · Agent 平面（cordis 配置） |
+| 把 Runtime 的回复变成浏览器要的 `assistant/message` mux 帧（顶层 `surfaceOp:append`） | BFF **合成** | **新增** | 后端 · Web 平面（BFF） |
+| 会话面把该帧 append 渲染出来 | DSH client | **既有** | Web 前端（DSH） |
+
+一句话：**"模型怎么想、怎么执行工具、怎么渲染"是 DSH 既有的（前端 + agent 平面都零改动）；"谁能进来（认证）、路由到哪个隔离 VM、以及把 DSH 浏览器协议 ↔ AgentCore 契约两套协议缝起来"是本项目新增的，且几乎全部落在后端两个新组件——Web 平面的 BFF 与 Agent 平面的 adapter+cordis。** 另一个典型"新增在 BFF"的例子：`session.export`（下载会话日志）本应由 `dsh web` host 提供，我们没跑它，于是由 BFF 新实现该 `GET/HEAD /api/session.export` 端点。
+
+### H. 用户下次回来，还会被路由到同一个 Runtime 吗？
+
+**路由亲和：已实现。** `runtimeSessionId = ses_{userHash}_{workspaceHash(workspaceId)}` 是**确定性派生**的：
+- `userHash = HMAC(MEMORY_KEY, tenant:sub)[:16]`——`sub` 是 Cognito 稳定用户标识，`MEMORY_KEY` 生产环境从 Secrets Manager（`dsh-bff/memory-key`）注入、跨重启稳定。
+- `workspaceId` 首次是随机 `wsp_{uuid}`，但**持久化在 DynamoDB**（`PK=TENANT#..#USER#userHash, SK=WORKSPACE#wsid`）；下次登录 `listOrSeedWorkspaces` 先查已有 → **复用同一 workspaceId**，不再新建。
+
+因此同一"用户+workspace"每次都呈现**同一个 AgentCore session id**，AgentCore 据此把请求路由到**同一 micro-VM**（会话粘性）。
+
+**但要诚实说明两条边界（MVP 未做持久化）：**
+1. **"同一 session id" ≠ 一定命中"同一个还活着的 VM"**。AgentCore 会回收空闲 micro-VM；若用户隔一段时间再来、VM 已被回收，同一 session id 会路由到一个**新的 micro-VM**（VM 内的临时状态已不在）。
+2. **会话历史/上下文目前不持久化**。BFF 的会话事件日志存在**进程内存**（`sessions` Map），BFF 任务重启即丢；DynamoDB 只存**路由元数据**（workspaceId、runtimeSessionId、lastActivityAt），**不存对话事件**。DSH session 日志在 micro-VM 内、随 VM 回收而失。
+
+结论：**路由键稳定、会“尽量”回到同一 VM；但"回到上次的对话/上下文"目前不保证**——重启或 VM 回收后，用户回到同一 workspace/路由，却很可能是**全新会话**。要做到跨访问的持久会话，需补设计 §10 的 workspace/session 持久化（EFS 或 S3/DynamoDB 存事件日志）——这是已登记的后续项（见 D）。
