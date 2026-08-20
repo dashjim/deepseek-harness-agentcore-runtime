@@ -1951,3 +1951,79 @@ Phase 1（本地真 Bedrock）与 Phase 2（真云部署：Runtime + 身份/权�
 
 ### D. 尚未实现（按设计记录为后续）
 流式 `/ws` 逐 token 渲染、§11 全局 AgentCore Memory、托管 Web Search、§4/§8 完整交互协议（turn-cancel/approval/user-question/subagent 控制）、DSH 工具巡检面板（`dynamicCordisRunner` 已返回合法空值消除报错，但面板未接真数据）。
+
+### E. 用户身份如何一路传到 Runtime（SigV4 场景下的澄清）
+
+关键澄清：**用户身份只在 BFF 处认证；BFF→Runtime 这一跳是以"服务身份"（ECS task role，SigV4）调用，不透传用户 JWT。** 下游"是哪个用户"靠**服务端派生的 `runtimeSessionId`**（每 用户+workspace 唯一）作为 AgentCore Runtime 的 session id 来承载——同一 id 路由到同一 micro-VM，不同用户→不同 session→不同 micro-VM，从而隔离。这不是 OBO/JWT 透传，而是"BFF 中介身份 + session 分区隔离"。
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant CF as CloudFront
+  participant BFF as BFF (ECS)
+  participant COG as Cognito
+  participant DDB as Session Directory (DynamoDB)
+  participant RT as AgentCore Runtime (per-user microVM)
+
+  B->>CF: POST /auth/login {username,password} (HTTPS)
+  CF->>BFF: 转发 (+X-Origin-Verify)
+  BFF->>COG: InitiateAuth USER_PASSWORD_AUTH (+SECRET_HASH)
+  COG-->>BFF: IdToken / AccessToken
+  Note over BFF: 取 sub，随即丢弃 token（浏览器不持 JWT）<br/>actorId=HMAC(MEMORY_KEY, tenant:sub)；userHash=actorId[:16]
+  BFF-->>B: Set-Cookie dsh_sess=… (Secure+HttpOnly+SameSite=Lax)
+
+  B->>BFF: POST /api/session.prompt {sessionId,content} (带 cookie)
+  Note over BFF: 校验 cookie→userHash；owner 校验 workspace 归属（防 IDOR）
+  BFF->>DDB: GetItem(PK=TENANT#..#USER#userHash, SK=WORKSPACE#wsid)
+  DDB-->>BFF: runtimeSessionId=ses_{userHash}_{wsHash}（服务端生成，浏览器永不可见）
+  BFF->>RT: InvokeAgentRuntime（SigV4 as task role，<br/>runtimeSessionId=ses_…，payload={prompt}）
+  Note over RT: 同一 runtimeSessionId → 同一 microVM（会话粘性 + 隔离）
+  RT-->>BFF: {response, toolCalls, finishReason}
+  BFF-->>B: 经 mux WebSocket 推 assistant/message 帧（见 F）
+```
+
+要点：
+- 认证边界在 BFF；`runtimeSessionId` 是身份在下游的"载体"，**服务端派生、浏览器不可见、不接受客户端输入**（防伪造他人 session → 防 IDOR，实测跨用户 403）。
+- 若将来需 Runtime 侧按用户做 Memory namespace / 审计，可由 BFF 在 invocation 的 payload/header 附带 `actorId`（当前 MVP 未启用 Memory，故未传）。
+
+### F. HTTP 与 WebSocket 如何同时使用（具体示例）
+
+DSH Web 协议**同时用两种通道**，各司其职：
+- **HTTP `POST /api/<method>`** = 命令/查询（请求→响应，短）：host.describe、workspace.list、session.list、session.create、**session.prompt** 等。
+- **两条下行 WebSocket（只服务端→浏览器）**：`/api/events.mux`（某 session 的模型/工具事件流）+ `/api/events.host`（host 级事件：session 增删、workspace 变更）。异步/流式结果走这里。
+
+一次"发消息"的完整时序（HTTP 下命令、WS 收结果）：
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant BFF as BFF
+
+  B->>BFF: WS connect /api/events.mux  (下行)
+  B->>BFF: WS connect /api/events.host (下行)
+  B->>BFF: POST /api/host.describe (HTTP) → 200 {ok,value}
+  B->>BFF: POST /api/workspace.list, /api/session.list (HTTP) → 200
+  Note over B,BFF: 连接就绪，UI 渲染空会话
+
+  B->>BFF: POST /api/session.prompt {sessionId,content} (HTTP)
+  BFF-->>B: 200 {ok:true, accepted}  ← HTTP 只回"已受理"，不含回复正文
+  Note over BFF: BFF 调云端 Runtime(SigV4) 执行该 turn
+  BFF-->>B: mux WS: session/event  turn/start
+  BFF-->>B: mux WS: session/event  assistant/message（surfaceOp:append，正文在此）
+  BFF-->>B: mux WS: session/event  turn/end
+```
+
+一句话：**HTTP 负责"下指令/查状态"，WebSocket 负责"把 turn 的事件流/最终回复推回来"**。助手回复的文本不是 `session.prompt` 的 HTTP 响应，而是随后 mux WS 上的 `assistant/message` 帧（其顶层 `surfaceOp:"append"` 决定它 append 到会话面）。本实现里：session.prompt(HTTP) → 阻塞 InvokeAgentRuntime → 把最终回复**合成为一帧** mux 事件推回；真流式则是逐 token 多帧（后续项）。
+
+### G. Python SDK 不完整——最终是怎么支持的？
+
+结论：**Agent 平面用了 Python SDK；Web 平面没用 SDK，而是 BFF 直接讲 DSH 的浏览器协议（`/api` RPC + 两条 WS 帧）自己实现。** 分工如下：
+
+| 面 | 用什么 | 说明 |
+|---|---|---|
+| Agent 平面（Runtime 内） | **stock Python SDK**（`DeepSeekHarness`）+ stock `dsh-jsonrpc-agent` runtime | adapter 用 SDK 做 initialize + 提交 prompt + 收 session event，跑一个真实 coding turn（bash/文件工具）。SDK 能力足够"执行一个 turn"。 |
+| Web 平面（BFF） | **不经 SDK**，BFF 原生实现 DSH 浏览器 `/api/*` RPC 与 mux/host WS 帧 | SDK 本就不提供完整 Web API（§0.5/§9），故 BFF 自己合成 boot 契约（host.describe/workspace.list/session.list/session.models…）与事件帧，仅把"执行 prompt"委托给 Runtime。 |
+
+与设计 §9 的差异：设计设想"custom DSH runtime + 扩展 JSON-RPC server"补齐 Web API；**实际没有构建扩展 runtime**，而是"stock SDK 跑 turn + BFF 模拟最小 Web 协议"。所以 SDK 的"不支持"**不是靠扩展 SDK 解决的**，而是靠 **BFF 侧模拟 + 把真正的模型/工具执行下沉到 Runtime（SDK）** 解决。
+
+对"是不是没用 Python SDK 而直接用 RPC"的直接回答：**部分正确**——BFF 对浏览器这一侧确实是直接实现 RPC/WS 协议（没用 SDK）；但 Runtime 那一侧执行 turn 仍用 Python SDK（SDK 内部再对 DSH runtime 走 stdio JSON-RPC）。代价：DSH 高级 Web 能力（fork/search/subagent 控制/attachment/真流式）目前未接入（见 D 项后续）。
