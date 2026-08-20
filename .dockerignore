@@ -1,0 +1,8 @@
+.git
+.sessions
+**/__pycache__
+**/*.pyc
+.pytest_cache
+docs
+*.log
+config/runtime_config.json

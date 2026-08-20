@@ -1,0 +1,23 @@
+{
+  "name": "dsh-web-bff",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Production BFF: Cognito login + Session Directory owner check + SigV4 InvokeAgentRuntime, fronting the DSH Web UI.",
+  "scripts": {
+    "start": "node server.mjs",
+    "smoke:cloud": "node cloud_smoke.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "^3.1113.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1113.0",
+    "@aws-sdk/client-dynamodb": "^3.1113.0",
+    "@aws-sdk/client-secrets-manager": "^3.1113.0",
+    "@aws-sdk/util-dynamodb": "^3.996.9",
+    "jszip": "^3.10.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.55.0"
+  }
+}

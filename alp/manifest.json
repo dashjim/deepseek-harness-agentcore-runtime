@@ -1,0 +1,74 @@
+{
+  "alp_version": "1.0",
+  "demo": {
+    "name": "DeepSeek Harness on AgentCore Runtime",
+    "slug": "dsh-agentcore-runtime",
+    "description": "把开源 DeepSeek Harness (DSH) 编码 Agent 托管到 Amazon Bedrock AgentCore Runtime：每用户隔离的云端 Coding Agent，保留 DSH Web 界面，模型用 Bedrock GPT。含 Cognito 登录、Session Directory 归属隔离、VPC 无公网出站的运行时。",
+    "use_case": "@file:overview.md",
+    "category": {
+      "service": "Amazon Bedrock AgentCore"
+    },
+    "type": "live",
+    "tags": ["AgentCore", "Runtime", "Coding Agent", "DeepSeek Harness", "Bedrock GPT"],
+    "created_date": "2026-08-19"
+  },
+  "owner": {
+    "name": "Junxiang",
+    "email": "junxiang@demo-portal.local"
+  },
+  "runtime": {
+    "session_id": "<RUNTIME_ID>",
+    "source": "register",
+    "region": "us-west-2",
+    "runtime_id": "<RUNTIME_ID>",
+    "endpoint_arn": "arn:aws:bedrock-agentcore:us-west-2:<ACCOUNT_ID>:runtime/<RUNTIME_ID>/runtime-endpoint/DEFAULT",
+    "model_id": "us.openai.gpt-5.6-sol",
+    "log_group": "/aws/bedrock-agentcore/runtimes/<RUNTIME_ID>-DEFAULT"
+  },
+  "availability": {
+    "code": true,
+    "live_demo": "https://<CLOUDFRONT_DOMAIN>",
+    "video_count": 0
+  },
+  "credentials": {
+    "type": "cognito",
+    "instructions": "用测试账号登录 https://<CLOUDFRONT_DOMAIN> （邮箱 + 密码）。测试账号 alice@dsh-agentcore.test / bob@dsh-agentcore.test，密码见 Secrets Manager dsh-agentcore/test-users（打包上传门户时从中取，勿写入源码/仓库）。",
+    "accounts": [
+      {
+        "username": "alice@dsh-agentcore.test",
+        "password": "SECRETS_MANAGER:dsh-agentcore/test-users",
+        "role": "user",
+        "note": "普通用户；每用户 workspace 隔离"
+      }
+    ]
+  },
+  "features": [
+    { "name": "云端编码 Agent", "description": "DSH agent loop + bash/文件工具运行在 AgentCore Runtime 每用户 microVM" },
+    { "name": "Bedrock GPT 驱动", "description": "经 DSH pi-ai 的 amazon-bedrock provider 调用 us.openai.gpt-5.6-sol，支持工具调用" },
+    { "name": "保留 DSH Web 界面", "description": "浏览器仍用 DSH 原生 Web 协议，经 BFF 桥接到 AgentCore /invocations" },
+    { "name": "多用户身份与隔离", "description": "Cognito 登录 + DynamoDB Session Directory 每请求归属校验（防 IDOR），runtimeSessionId 服务端派生不暴露" },
+    { "name": "安全网络", "description": "CloudFront(HTTPS)→ALB(仅 CloudFront 前缀列表)→ECS；Runtime VPC 模式无公网/无任意出站；IAM 最小权限" }
+  ],
+  "tech_stack": {
+    "agent_framework": "DeepSeek Harness (custom, non-Strands)",
+    "deployment_model": "AgentCore Runtime",
+    "frontend": "DeepSeek Harness Web UI (React) via Node BFF",
+    "language": "Python 3.12 (adapter) + Node 22 (DSH runtime / BFF)",
+    "infrastructure": "AWS CLI (ECR / AgentCore Runtime / Cognito / DynamoDB / ECS Fargate / ALB / CloudFront)",
+    "agentcore_services": ["Runtime"]
+  },
+  "assets": {
+    "architecture_diagram": "architecture.png",
+    "demo_flow": "demo-flow.md",
+    "deployment_guide": "deployment-guide.md",
+    "code_package": "code.zip",
+    "overview": "overview.md",
+    "videos": [],
+    "screenshots": ["screenshots/cloud-03-reply.png"],
+    "quick_links": [
+      { "name": "架构图", "path": "architecture.png", "type": "image" },
+      { "name": "演示流程", "path": "demo-flow.md", "type": "document" },
+      { "name": "部署指南", "path": "deployment-guide.md", "type": "document" }
+    ]
+  }
+}

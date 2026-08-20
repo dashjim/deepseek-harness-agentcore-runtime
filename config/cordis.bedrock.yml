@@ -1,0 +1,71 @@
+# DeepSeek Harness agent config driven by Amazon Bedrock (GPT via pi-ai).
+#
+# Structure mirrors the SDK's bundled default cordis.yml (agent spine +
+# local bash/fs providers + JSONL sessions), with one deviation: the LLM
+# adapter is @deepseek-ai/dsh-llm-pi-ai on its amazon-bedrock catalog route
+# instead of the stock DeepSeek adapter.
+#
+# The model-facing bash tool is wired inside the agent-spine-demo bundle
+# (it mounts ToolRuntime + tool-bash); this leaf only supplies the local
+# bash executor + subprocess provider it consumes.
+
+# Stdio JSON-RPC server entry; without it the agent has no SDK client.
+- id: sdk-jsonrpc-server
+  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
+
+# Agent spine; the SDK server creates agents per sessionId.
+- id: agent-core
+  name: '@deepseek-ai/dsh-agent-spine-demo'
+  config:
+    workspaceContext:
+      maxBytes: 65536
+
+# Amazon Bedrock adapter via pi-ai. `amazon-bedrock` is a pi-ai *catalog*
+# route, so it reuses pi-ai's installed Bedrock provider (Converse Stream /
+# SigV4). We declare no `api` (keeps the Bedrock protocol) and no `apiKeyEnv`
+# (defer to pi-ai ambient AWS discovery -> the AWS SDK default credential
+# chain, which resolves the EC2 instance role over IMDS). Region is taken
+# from AWS_REGION in the runtime subprocess env (set to us-west-2 by the
+# client). The target model is newer than pi-ai's bundled catalog, so it is
+# declared here; unset sizes fall back to the route defaults.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      amazon-bedrock:
+        # The target model is newer than pi-ai's bundled catalog, so the route
+        # cannot inherit an endpoint from it. pi-ai's Bedrock provider has no
+        # static baseUrl (endpoints are region-derived), so we supply the
+        # standard regional endpoint to satisfy route resolution. Region is
+        # still taken from AWS_REGION at request time; this endpoint only needs
+        # to be a well-formed standard Bedrock runtime URL.
+        baseURL: https://bedrock-runtime.us-west-2.amazonaws.com
+        models:
+          - id: us.openai.gpt-5.6-sol
+
+# JSONL persistence; $DSH_SESSION_ROOT wins over ./.sessions in the process cwd.
+- id: sessions
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: !!js process.env.DSH_SESSION_ROOT ?? './.sessions'
+
+# Persistence owns durable storage; this policy selects the request,
+# tool-dispatch, and completed-step durability checkpoints.
+- id: session-checkpoints
+  name: '@deepseek-ai/dsh-session-checkpoint-policy'
+
+# Managed child-process groups for the bash executor.
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+
+# Local bash executor; $DSH_CWD wins over the process cwd.
+- id: bash
+  name: '@deepseek-ai/dsh-bash-local'
+  config:
+    cwd: !!js process.env.DSH_CWD ?? process.cwd()
+
+# Local filesystem provider for workspace instruction loading.
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+  config:
+    cwd: !!js process.env.DSH_CWD ?? process.cwd()

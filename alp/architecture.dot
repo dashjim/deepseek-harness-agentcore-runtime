@@ -1,0 +1,48 @@
+digraph dsh_agentcore {
+  rankdir=TB;
+  bgcolor="white";
+  labelloc="t";
+  fontname="Helvetica";
+  fontsize=22;
+  label="DeepSeek Harness on AgentCore Runtime — Deployed Architecture (us-west-2)\n";
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=14, margin="0.22,0.14", color="#37475A", fontcolor="#0f1b2d"];
+  edge [fontname="Helvetica", fontsize=12, color="#37475A"];
+  nodesep=0.5; ranksep=0.55;
+
+  browser [label="Browser\nDeepSeek Harness Web UI", fillcolor="#EAF2FB"];
+  cf  [label="CloudFront  (only public entry)\nHTTPS redirect · CachingDisabled", fillcolor="#FFF4E5"];
+
+  subgraph cluster_web {
+    label="Web plane (VPC)"; fontsize=15; color="#9bb4d0"; style="rounded"; bgcolor="#FbFdff";
+    alb [label="ALB\ninbound = CloudFront prefix list only\n(no 0.0.0.0/0) + X-Origin-Verify", fillcolor="#FDECEA"];
+    bff [label="ECS Fargate — BFF (Node)\nCognito login (HttpOnly cookie) · anti-IDOR owner check\nDeepSeek Harness Web UI (baked static) · SigV4 → Runtime", fillcolor="#E8F5E9"];
+  }
+
+  subgraph cluster_agent {
+    label="Agent plane — AgentCore Runtime  (VPC · per-user microVM · no NAT/IGW)"; fontsize=15; color="#9bb4d0"; style="rounded"; bgcolor="#FbFdff";
+    adapter [label="Python Adapter\n/ping + /invocations · lazy singleton", fillcolor="#E8F5E9"];
+    dsh [label="DeepSeek Harness\nagent loop + bash / file tools", fillcolor="#EAF2FB"];
+  }
+
+  bedrock [label="Amazon Bedrock\nus.openai.gpt-5.6-sol", fillcolor="#FFF4E5"];
+
+  subgraph cluster_aws {
+    label="Identity & state (AWS managed)"; fontsize=15; color="#9bb4d0"; style="rounded"; bgcolor="#FbF7FE";
+    cognito [label="Cognito\nUser Pool", fillcolor="#F3E8FD"];
+    ddb [label="DynamoDB\nSession Directory", fillcolor="#F3E8FD"];
+    sm [label="Secrets Manager", fillcolor="#F3E8FD"];
+  }
+
+  browser -> cf [label="HTTPS"];
+  cf -> alb [label="HTTP + X-Origin-Verify"];
+  alb -> bff [label="TCP 3090"];
+  bff -> adapter [label="SigV4 InvokeAgentRuntime · sticky Session-Id"];
+  adapter -> dsh [label="stdio JSON-RPC"];
+  dsh -> bedrock [label="Converse (via VPC endpoint)"];
+
+  bff -> cognito [label="USER_PASSWORD_AUTH", style=dashed, constraint=false];
+  bff -> ddb [label="owner lookup", style=dashed, constraint=false];
+  bff -> sm [label="get secret", style=dashed, constraint=false];
+
+  { rank=same; bff; cognito; ddb; sm; }
+}
