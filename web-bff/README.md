@@ -72,4 +72,29 @@ BFF(:3090)，BFF 反代 UI 资源。构建前需由部署步骤把 DSH web 静�
 
 ## 关于 web-bff/static/（gitignored）
 
-`web-bff/static/` 是 DSH Web UI 一次性渲染出的闭包（index.html 含 `window.__DSH_BOOT__` + dist assets + 38 个 `/plugins/<id>/client.js`，约 15M），是**派生产物、不入 git**。再生方法：起一次 `dsh web`（源码方式，DSH 仓库），抓取其 `GET /`、`/assets/*`、各 `/plugins/<id>/client.js` 落盘到 `web-bff/static/`。镜像构建（`web-bff/Dockerfile`）会 COPY 该目录。
+`web-bff/static/` 是 DSH Web UI 一次性渲染出的闭包（index.html 含 `window.__DSH_BOOT__`
++ dist assets + 38 个 `/plugins/<id>/client.js`，约 15M / 152 文件），是**派生产物、不入 git**。
+镜像构建（`web-bff/Dockerfile`）会 `COPY static/`。
+
+**再生（脚本化）**：用 `web-bff/capture-static.mjs`。它自动起一次 `dsh web`（源码方式，
+指向 DSH 仓库）、等就绪、解析 `GET /` 注入的 `window.__DSH_BOOT__` 插件清单，跟随 index.html
+与 JS/CSS 里的引用（`/assets/**` 含 dist/fonts/langs、sourceMappingURL）以及每个
+`/plugins/<id>/client.js` 全量下载落盘，最后自验证（index 含 `__DSH_BOOT__`、38 个插件
+client.js 齐全、重新起静态服务 0 个 404）。
+
+```bash
+# 需 DSH monorepo 已 pnpm run build。默认 OUT_DIR=web-bff/static、PORT=3080。
+DSH_REPO_ROOT=/path/to/deepseek-harness node web-bff/capture-static.mjs
+
+# 对着一台已在跑的 dsh web 抓取（跳过自起）：
+BASE_URL=http://127.0.0.1:3080 node web-bff/capture-static.mjs
+
+# 与已有闭包做文件集比对（回归校验）：
+DSH_REPO_ROOT=/path/to/deepseek-harness REFERENCE_DIR=./web-bff/static \
+  OUT_DIR=/tmp/static-new node web-bff/capture-static.mjs
+```
+
+环境变量：`DSH_REPO_ROOT`（自起模式必填）、`PORT`(3080)、`OUT_DIR`(默认 `web-bff/static`)、
+`BASE_URL`（给已在跑的 dsh web 则不自起）、`DSH_WEB_CMD`（自起命令，默认 `pnpm dsh web --port {PORT}`，
+`{PORT}` 会被替换）、`READY_TIMEOUT_MS`(90000)、`REFERENCE_DIR`（可选比对基准）。
+部署时 `scripts/deploy-web.sh` 会在构建 BFF 镜像前按需自动调用它（见 `docs/DEPLOY.md`）。

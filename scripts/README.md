@@ -23,8 +23,12 @@ Cognito 登录，SigV4 调 Runtime）。
 1. AWS 凭证已配置（`aws sts get-caller-identity` 可用），有创建上述资源的权限。
 2. 目标区已**开通模型访问**（`us.openai.gpt-5.6-sol` inference profile 可用）。
 3. Docker 可构建 `linux/arm64`（buildx / binfmt）。
-4. DSH monorepo 已 checkout 并 `pnpm run build`（`DSH_REPO_ROOT` 指向它）——Runtime 镜像需要。
-5. `web-bff/static/`（gitignored 的 DSH web 闭包）已按 `web-bff/README.md` 再生——BFF 镜像需要。
+4. DSH monorepo 已 checkout 并 `pnpm run build`（`DSH_REPO_ROOT` 指向它）——Runtime 镜像
+   与 DSH Web 静态闭包捕获都需要。
+5. `web-bff/static/`（gitignored 的 DSH web 闭包）——BFF 镜像需要。**无需手动再生**：
+   `deploy-web.sh` 在构建 BFF 镜像前，若该目录缺失或 `CAPTURE_STATIC=true`，会自动调用
+   `node web-bff/capture-static.mjs`（读 `DSH_REPO_ROOT`）从 `dsh web` 捕获。也可手动跑：
+   `DSH_REPO_ROOT=<dsh> node web-bff/capture-static.mjs`。
 6. 配置：`cp scripts/deploy.env.example scripts/deploy.env` 后填真实值（`deploy.env` 已 gitignore）。
 
 ## 部署顺序
@@ -45,7 +49,8 @@ bash scripts/deploy-web.sh
 
 - **deploy-runtime.sh** → ECR 仓库、最小权限执行角色、（复用或新建的）VPC 网络、
   `READY` 的 AgentCore Runtime，打印 `RUNTIME_ID` / `RUNTIME_ARN`。
-- **deploy-web.sh** → Cognito 池+机密客户端（secret 入 Secrets Manager）、测试用户
+- **deploy-web.sh** → （必要时先 `capture-static.mjs` 捕获 DSH Web 静态闭包）、
+  Cognito 池+机密客户端（secret 入 Secrets Manager）、测试用户
   （密码入 Secrets Manager）、DynamoDB 会话目录表、BFF 三个密钥、BFF 镜像、
   BFF 任务/执行角色、ECS 集群+任务定义+服务、ALB+TG+监听器、CloudFront，
   打印公网 URL。

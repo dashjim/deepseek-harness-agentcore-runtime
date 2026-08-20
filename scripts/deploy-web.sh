@@ -141,9 +141,23 @@ ORIGIN_VERIFY_VALUE=$("${AWS[@]}" secretsmanager get-secret-value \
 echo "bff secrets: ${COOKIE_ARN} ${MEMORY_ARN} ${ORIGIN_ARN}"
 
 echo "== 5. build + push BFF image ${IMAGE_URI} =="
+# The image bakes the DSH Web UI static closure (web-bff/static/, a gitignored
+# derived artifact). Capture it from `dsh web` when it is missing, or whenever
+# CAPTURE_STATIC=true forces a refresh. See web-bff/capture-static.mjs.
+if [ "${CAPTURE_STATIC:-false}" = "true" ] || [ ! -f "${BFF_DIR}/static/index.html" ]; then
+  if [ -z "${DSH_REPO_ROOT:-}" ]; then
+    echo "ERROR: web-bff/static/ must be (re)generated but DSH_REPO_ROOT is unset."
+    echo "       Point DSH_REPO_ROOT at the built DSH monorepo checkout and re-run,"
+    echo "       or stage web-bff/static/ manually per web-bff/README.md."
+    exit 1
+  fi
+  echo "capturing DSH web static closure into ${BFF_DIR}/static (DSH_REPO_ROOT=${DSH_REPO_ROOT})"
+  DSH_REPO_ROOT="${DSH_REPO_ROOT}" node "${BFF_DIR}/capture-static.mjs"
+fi
 if [ ! -f "${BFF_DIR}/static/index.html" ]; then
-  echo "ERROR: web-bff/static/ is missing (gitignored derived DSH web closure)."
-  echo "       Regenerate it per web-bff/README.md before building the BFF image."
+  echo "ERROR: web-bff/static/ is still missing (gitignored derived DSH web closure)."
+  echo "       Regenerate it: DSH_REPO_ROOT=<dsh-repo> node web-bff/capture-static.mjs"
+  echo "       (or set CAPTURE_STATIC=true with DSH_REPO_ROOT and re-run this script)."
   exit 1
 fi
 if ! "${AWS[@]}" ecr describe-repositories --repository-names "${ECR_BFF_REPO}" >/dev/null 2>&1; then

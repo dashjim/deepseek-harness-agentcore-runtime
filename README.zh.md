@@ -68,6 +68,7 @@ docker run -p 8080:8080 -e AWS_REGION=us-west-2 <image>   # /ping + POST /invoca
 **云部署：** ECR + `create-agent-runtime`（VPC 模式），Cognito + DynamoDB，然后把 BFF 部到
 ECS/ALB/CloudFront。所有部署具体 ID 通过 env / Secrets Manager 注入（不进 git）；所需变量见
 `web-bff/README.md`，完整步骤见 `docs/PHASE2-runtime-deploy.md` + `docs/auth-design.md`。
+📄 **端到端部署手册（clone → 捕获静态 → 构建 → 部署 → 验证 → 回收）：[docs/DEPLOY.md](docs/DEPLOY.md)。**
 
 ## 状态
 

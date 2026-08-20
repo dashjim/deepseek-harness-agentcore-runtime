@@ -71,7 +71,8 @@ docker run -p 8080:8080 -e AWS_REGION=us-west-2 <image>   # /ping + POST /invoca
 **Cloud deploy:** ECR + `create-agent-runtime` (VPC mode), Cognito + DynamoDB, then the BFF on
 ECS/ALB/CloudFront. All deployment-specific IDs are injected via env / Secrets Manager (not in git);
 see `web-bff/README.md` for the required variables and `docs/PHASE2-runtime-deploy.md` +
-`docs/auth-design.md` for the full recipe.
+`docs/auth-design.md` for the full recipe. 📄 **End-to-end deploy runbook (clone → capture static →
+build → deploy → verify → teardown): [docs/DEPLOY.md](docs/DEPLOY.md).**
 
 ## Status
 
