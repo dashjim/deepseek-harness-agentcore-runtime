@@ -1,4 +1,4 @@
-# Production BFF image for the DeepSeek Harness (DSH) Web UI.
+# BFF image for the DeepSeek Harness (DSH) Web UI.
 #
 # One process serves everything the browser needs:
 #   - the BFF on 0.0.0.0:3090 -> Cognito login, /api/*, mux/host WebSockets,

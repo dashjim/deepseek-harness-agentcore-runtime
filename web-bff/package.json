@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Production BFF: Cognito login + Session Directory owner check + SigV4 InvokeAgentRuntime, fronting the DSH Web UI.",
+  "description": "BFF: Cognito login + Session Directory owner check + SigV4 InvokeAgentRuntime, fronting the DSH Web UI.",
   "scripts": {
     "start": "node server.mjs",
     "smoke:cloud": "node cloud_smoke.mjs"

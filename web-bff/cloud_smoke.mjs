@@ -1,5 +1,5 @@
 /**
- * Cloud smoke: prove the production BFF (auth + Session Directory + owner check)
+ * Cloud smoke: prove the BFF (auth + Session Directory + owner check)
  * talks to the *cloud* AgentCore Runtime, with no browser.
  *
  * Flow:
